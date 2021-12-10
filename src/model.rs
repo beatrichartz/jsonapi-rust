@@ -3,11 +3,11 @@
 //! structs which implement `Deserialize` to be converted to/from a
 //! [`JsonApiDocument`](../api/struct.JsonApiDocument.html) or
 //! [`Resource`](../api/struct.Resource.html)
-pub use std::collections::HashMap;
 pub use crate::api::*;
 use crate::errors::*;
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, to_value, Value, Map};
+use serde_json::{from_value, to_value, Map, Value};
+pub use std::collections::HashMap;
 
 /// A trait for any struct that can be converted from/into a
 /// [`Resource`](api/struct.Resource.tml). The only requirement is that your
@@ -21,7 +21,7 @@ where
     #[doc(hidden)]
     fn jsonapi_type(&self) -> String;
     #[doc(hidden)]
-    fn jsonapi_id(&self) -> String;
+    fn jsonapi_id(&self) -> Option<String>;
     #[doc(hidden)]
     fn relationship_fields() -> Option<&'static [&'static str]>;
     #[doc(hidden)]
@@ -29,37 +29,36 @@ where
     #[doc(hidden)]
     fn build_included(&self) -> Option<Resources>;
 
-    fn from_jsonapi_resource(resource: &Resource, included: &Option<Resources>)
-        -> Result<Self>
-    {
-
+    fn from_jsonapi_resource(resource: &Resource, included: &Option<Resources>) -> Result<Self> {
         let visited_relationships: Vec<&str> = Vec::new();
-        Self::from_serializable(Self::resource_to_attrs(resource, included, &visited_relationships))
+        Self::from_serializable(Self::resource_to_attrs(
+            resource,
+            included,
+            &visited_relationships,
+        ))
     }
 
     /// Create a single resource object or collection of resource
-    /// objects directly from 
+    /// objects directly from
     /// [`DocumentData`](../api/struct.DocumentData.html). This method
     /// will parse the document (the `data` and `included` resources) in an
     /// attempt to instantiate the calling struct.
     fn from_jsonapi_document(doc: &DocumentData) -> Result<Self> {
         match doc.data.as_ref() {
-            Some(primary_data) => {
-                match *primary_data {
-                    PrimaryData::None => bail!("Document had no data"),
-                    PrimaryData::Single(ref resource) => {
-                        Self::from_jsonapi_resource(resource, &doc.included)
-                    }
-                    PrimaryData::Multiple(ref resources) => {
-                        let visited_relationships: Vec<&str> = Vec::new();
-                        let all: Vec<ResourceAttributes> = resources
-                            .iter()
-                            .map(|r| Self::resource_to_attrs(r, &doc.included, &visited_relationships))
-                            .collect();
-                        Self::from_serializable(all)
-                    }
+            Some(primary_data) => match *primary_data {
+                PrimaryData::None => bail!("Document had no data"),
+                PrimaryData::Single(ref resource) => {
+                    Self::from_jsonapi_resource(resource, &doc.included)
                 }
-            }
+                PrimaryData::Multiple(ref resources) => {
+                    let visited_relationships: Vec<&str> = Vec::new();
+                    let all: Vec<ResourceAttributes> = resources
+                        .iter()
+                        .map(|r| Self::resource_to_attrs(r, &doc.included, &visited_relationships))
+                        .collect();
+                    Self::from_serializable(all)
+                }
+            },
             None => bail!("Document had no data"),
         }
     }
@@ -83,26 +82,22 @@ where
         }
     }
 
-
     /// Converts the struct into a complete
     /// [`JsonApiDocument`](../api/struct.JsonApiDocument.html)
     fn to_jsonapi_document(&self) -> JsonApiDocument {
         let (resource, included) = self.to_jsonapi_resource();
-        JsonApiDocument::Data (
-            DocumentData {
-                data: Some(PrimaryData::Single(Box::new(resource))),
-                included,
-                ..Default::default()
-            }
-        )
+        JsonApiDocument::Data(DocumentData {
+            data: Some(PrimaryData::Single(Box::new(resource))),
+            included,
+            ..Default::default()
+        })
     }
-
 
     #[doc(hidden)]
     fn build_has_one<M: JsonApiModel>(model: &M) -> Relationship {
         Relationship {
             data: Some(IdentifierData::Single(model.as_resource_identifier())),
-            links: None
+            links: None,
         }
     }
 
@@ -110,9 +105,9 @@ where
     fn build_has_many<M: JsonApiModel>(models: &[M]) -> Relationship {
         Relationship {
             data: Some(IdentifierData::Multiple(
-                models.iter().map(|m| m.as_resource_identifier()).collect()
+                models.iter().map(|m| m.as_resource_identifier()).collect(),
             )),
-            links: None
+            links: None,
         }
     }
 
@@ -159,9 +154,7 @@ where
     /// attempt to find and return the `Resource` whose `type` and `id`
     /// attributes match
     #[doc(hidden)]
-    fn lookup<'a>(needle: &ResourceIdentifier, haystack: &'a [Resource])
-        -> Option<&'a Resource>
-    {
+    fn lookup<'a>(needle: &ResourceIdentifier, haystack: &'a [Resource]) -> Option<&'a Resource> {
         for resource in haystack {
             if resource._type == needle._type && resource.id == needle.id {
                 return Some(resource);
@@ -189,12 +182,20 @@ where
     /// Furthermore the current implementation of this crate does not establish an object graph
     /// that could be used to traverse these relationships effectively.
     #[doc(hidden)]
-    fn resource_to_attrs(resource: &Resource, included: &Option<Resources>, visited_relationships: &Vec<&str>)
-        -> ResourceAttributes
-    {
+    fn resource_to_attrs(
+        resource: &Resource,
+        included: &Option<Resources>,
+        visited_relationships: &Vec<&str>,
+    ) -> ResourceAttributes {
         let mut new_attrs = HashMap::new();
         new_attrs.clone_from(&resource.attributes);
-        new_attrs.insert("id".into(), resource.id.clone().into());
+
+        match &resource.id {
+            Some(id) => {
+                new_attrs.insert("id".into(), id.clone().into());
+            }
+            None => (),
+        }
 
         // Copy the contents of `visited_relationships` so that we can mutate within the lexical
         // scope of this function call. This is also important so each edge that we follow (the
@@ -219,20 +220,20 @@ where
                         Some(IdentifierData::None) => Value::Null,
                         Some(IdentifierData::Single(ref identifier)) => {
                             let found = Self::lookup(identifier, inc)
-                                .map(|r| Self::resource_to_attrs(r, included, &this_visited) );
-                            to_value(found)
-                                .expect("Casting Single relation to value")
-                        },
+                                .map(|r| Self::resource_to_attrs(r, included, &this_visited));
+                            to_value(found).expect("Casting Single relation to value")
+                        }
                         Some(IdentifierData::Multiple(ref identifiers)) => {
-                            let found: Vec<Option<ResourceAttributes>> =
-                                identifiers.iter().map(|identifier|{
-                                    Self::lookup(identifier, inc).map(|r|{
+                            let found: Vec<Option<ResourceAttributes>> = identifiers
+                                .iter()
+                                .map(|identifier| {
+                                    Self::lookup(identifier, inc).map(|r| {
                                         Self::resource_to_attrs(r, included, &this_visited)
                                     })
-                                }).collect();
-                            to_value(found)
-                                .expect("Casting Multiple relation to value")
-                        },
+                                })
+                                .collect();
+                            to_value(found).expect("Casting Multiple relation to value")
+                        }
                         None => Value::Null,
                     };
                     new_attrs.insert(name.to_string(), value);
@@ -284,7 +285,7 @@ pub fn vec_to_jsonapi_resources<T: JsonApiModel>(
 ///
 /// #[derive(Debug, PartialEq, Serialize, Deserialize)]
 /// struct Flea {
-///     id: String,
+///     id: Option<String>,
 ///     name: String,
 /// }
 ///
@@ -292,11 +293,11 @@ pub fn vec_to_jsonapi_resources<T: JsonApiModel>(
 ///
 /// let fleas = vec![
 ///     Flea {
-///         id: "2".into(),
+///         id: Some("2".into()),
 ///         name: "rick".into(),
 ///     },
 ///     Flea {
-///         id: "3".into(),
+///         id: Some("3".into()),
 ///         name: "morty".into(),
 ///     },
 /// ];
@@ -305,13 +306,11 @@ pub fn vec_to_jsonapi_resources<T: JsonApiModel>(
 /// ```
 pub fn vec_to_jsonapi_document<T: JsonApiModel>(objects: Vec<T>) -> JsonApiDocument {
     let (resources, included) = vec_to_jsonapi_resources(objects);
-    JsonApiDocument::Data (
-        DocumentData {
-            data: Some(PrimaryData::Multiple(resources)),
-            included,
-            ..Default::default()
-        }
-    )
+    JsonApiDocument::Data(DocumentData {
+        data: Some(PrimaryData::Multiple(resources)),
+        included,
+        ..Default::default()
+    })
 }
 
 impl<M: JsonApiModel> JsonApiModel for Box<M> {
@@ -319,7 +318,7 @@ impl<M: JsonApiModel> JsonApiModel for Box<M> {
         self.as_ref().jsonapi_type()
     }
 
-    fn jsonapi_id(&self) -> String {
+    fn jsonapi_id(&self) -> Option<String> {
         self.as_ref().jsonapi_id()
     }
 
@@ -344,7 +343,12 @@ macro_rules! jsonapi_model {
     ($model:ty; $type:expr) => (
         impl JsonApiModel for $model {
             fn jsonapi_type(&self) -> String { $type.to_string() }
-            fn jsonapi_id(&self) -> String { self.id.to_string() }
+            fn jsonapi_id(&self) -> Option<String> {
+                match &self.id {
+                    Some(value) => Some(value.to_string()),
+                    None => None
+                }
+            }
             fn relationship_fields() -> Option<&'static [&'static str]> { None }
             fn build_relationships(&self) -> Option<Relationships> { None }
             fn build_included(&self) -> Option<Resources> { None }
@@ -366,7 +370,12 @@ macro_rules! jsonapi_model {
     ) => (
         impl JsonApiModel for $model {
             fn jsonapi_type(&self) -> String { $type.to_string() }
-            fn jsonapi_id(&self) -> String { self.id.to_string() }
+            fn jsonapi_id(&self) -> Option<String> {
+                match &self.id {
+                    Some(value) => Some(value.to_string()),
+                    None => None
+                }
+            }
 
             fn relationship_fields() -> Option<&'static [&'static str]> {
                 static FIELDS: &'static [&'static str] = &[

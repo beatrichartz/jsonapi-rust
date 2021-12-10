@@ -1,8 +1,8 @@
 //! The purpose of these tests is to validate compliance with the JSONAPI
 //! specification and to ensure that this crate reads documents properly
+extern crate env_logger;
 extern crate jsonapi;
 extern crate serde_json;
-extern crate env_logger;
 
 use jsonapi::api::*;
 
@@ -10,33 +10,57 @@ mod helper;
 use crate::helper::read_json_file;
 
 #[test]
-fn it_works() {
+fn it_works_with_ids_present() {
     let _ = env_logger::try_init();
     let resource = Resource {
         _type: "test".into(),
-        id: "123".into(),
+        id: Some("123".into()),
         attributes: ResourceAttributes::new(),
         relationships: Some(Relationships::new()),
         links: None,
         meta: Some(Meta::new()),
     };
 
-    assert_eq!(resource.id, "123");
+    assert_eq!(resource.id, Some("123".into()));
 
     let serialized = serde_json::to_string(&resource).unwrap();
     let deserialized: Resource = serde_json::from_str(&serialized).unwrap();
 
     assert_eq!(deserialized.id, resource.id);
 
-    let jsonapidocument = JsonApiDocument::Data (
-        DocumentData {
-            data: Some(PrimaryData::None),
-            ..Default::default()
-        }
-    );
+    let jsonapidocument = JsonApiDocument::Data(DocumentData {
+        data: Some(PrimaryData::None),
+        ..Default::default()
+    });
 
     assert_eq!(jsonapidocument.is_valid(), true);
+}
 
+#[test]
+fn it_works_with_ids_absent() {
+    let _ = env_logger::try_init();
+    let resource = Resource {
+        _type: "test".into(),
+        id: None,
+        attributes: ResourceAttributes::new(),
+        relationships: Some(Relationships::new()),
+        links: None,
+        meta: Some(Meta::new()),
+    };
+
+    assert_eq!(resource.id, None);
+
+    let serialized = serde_json::to_string(&resource).unwrap();
+    let deserialized: Resource = serde_json::from_str(&serialized).unwrap();
+
+    assert_eq!(deserialized.id, resource.id);
+
+    let jsonapidocument = JsonApiDocument::Data(DocumentData {
+        data: Some(PrimaryData::None),
+        ..Default::default()
+    });
+
+    assert_eq!(jsonapidocument.is_valid(), true);
 }
 
 #[test]
@@ -44,19 +68,17 @@ fn jsonapi_document_can_be_valid() {
     let _ = env_logger::try_init();
     let resource = Resource {
         _type: "test".into(),
-        id: "123".into(),
+        id: Some("123".into()),
         attributes: ResourceAttributes::new(),
         relationships: Some(Relationships::new()),
         links: None,
         meta: Some(Meta::new()),
     };
 
-    let jsonapi_document_with_data = JsonApiDocument::Data (
-        DocumentData {
-            data: Some(PrimaryData::Single(Box::new(resource))),
-            ..Default::default()
-        }
-    );
+    let jsonapi_document_with_data = JsonApiDocument::Data(DocumentData {
+        data: Some(PrimaryData::Single(Box::new(resource))),
+        ..Default::default()
+    });
 
     assert_eq!(jsonapi_document_with_data.is_valid(), true);
 }
@@ -67,19 +89,17 @@ fn jsonapi_document_invalid_errors() {
 
     let included_resource = Resource {
         _type: "test".into(),
-        id: "123".into(),
+        id: Some("123".into()),
         attributes: ResourceAttributes::new(),
         relationships: Some(Relationships::new()),
         links: None,
         meta: Some(Meta::new()),
     };
 
-    let no_content_document = JsonApiDocument::Data (
-        DocumentData {
-            data: None,
-            ..Default::default()
-        }
-    );
+    let no_content_document = JsonApiDocument::Data(DocumentData {
+        data: None,
+        ..Default::default()
+    });
 
     match no_content_document.validate() {
         None => assert!(false),
@@ -88,31 +108,25 @@ fn jsonapi_document_invalid_errors() {
         }
     }
 
-    let null_data_content_document = JsonApiDocument::Data (
-        DocumentData {
-            data: Some(PrimaryData::None),
-            ..Default::default()
-        }
-    );
+    let null_data_content_document = JsonApiDocument::Data(DocumentData {
+        data: Some(PrimaryData::None),
+        ..Default::default()
+    });
 
     match null_data_content_document.validate() {
         None => assert!(true),
         Some(_) => assert!(false),
     }
 
-    let included_without_data_document = JsonApiDocument::Data (
-        DocumentData {
-            included: Some(vec![included_resource]),
-            ..Default::default()
-        }
-    );
+    let included_without_data_document = JsonApiDocument::Data(DocumentData {
+        included: Some(vec![included_resource]),
+        ..Default::default()
+    });
 
     match included_without_data_document.validate() {
         None => assert!(false),
         Some(errors) => {
-            assert!(errors.contains(
-                &DocumentValidationError::IncludedWithoutData,
-            ));
+            assert!(errors.contains(&DocumentValidationError::IncludedWithoutData,));
         }
     }
 }
@@ -127,12 +141,10 @@ fn error_from_json_string() {
     let error: Result<JsonApiError, serde_json::Error> = serde_json::from_str(serialized);
     assert_eq!(error.is_ok(), true);
     match error {
-        Ok(jsonapierror) => {
-            match jsonapierror.id {
-                Some(id) => assert_eq!(id, "1"),
-                None => assert!(false),
-            }
-        }
+        Ok(jsonapierror) => match jsonapierror.id {
+            Some(id) => assert_eq!(id, "1"),
+            None => assert!(false),
+        },
         Err(_) => assert!(false),
     }
 }
@@ -202,30 +214,26 @@ fn api_document_from_json_file() {
     let data: Result<JsonApiDocument, serde_json::Error> = serde_json::from_str(&s);
 
     match data {
-        Ok(res) => {
-            match res {
-                JsonApiDocument::Error(_x) => assert!(false),
-                JsonApiDocument::Data(x) => {
-                    match x.data {
-                        Some(PrimaryData::Multiple(arr)) => {
-                            assert_eq!(arr.len(), 1);
-                        }
-                        Some(PrimaryData::Single(_)) => {
-                            println!(
-                                "api_document_from_json_file : Expected one Resource in a vector, \
-                                      not a direct Resource"
-                            );
-                            assert!(false);
-                        }
-                        Some(PrimaryData::None) => {
-                            println!("api_document_from_json_file : Expected one Resource in a vector");
-                            assert!(false);
-                        }
-                        None => assert!(false),
-                    }
+        Ok(res) => match res {
+            JsonApiDocument::Error(_x) => assert!(false),
+            JsonApiDocument::Data(x) => match x.data {
+                Some(PrimaryData::Multiple(arr)) => {
+                    assert_eq!(arr.len(), 1);
                 }
-            }
-        }
+                Some(PrimaryData::Single(_)) => {
+                    println!(
+                        "api_document_from_json_file : Expected one Resource in a vector, \
+                                      not a direct Resource"
+                    );
+                    assert!(false);
+                }
+                Some(PrimaryData::None) => {
+                    println!("api_document_from_json_file : Expected one Resource in a vector");
+                    assert!(false);
+                }
+                None => assert!(false),
+            },
+        },
         Err(err) => {
             println!("api_document_from_json_file : Error: {:?}", err);
             assert!(false);
@@ -241,59 +249,57 @@ fn api_document_collection_from_json_file() {
     let data: Result<JsonApiDocument, serde_json::Error> = serde_json::from_str(&s);
 
     match data {
-        Ok(x) => {
-            match x {
-                JsonApiDocument::Error(_) => assert!(false),
-                JsonApiDocument::Data(res) => {
-                    match res.data {
-                        Some(PrimaryData::Multiple(arr)) => {
-                            assert_eq!(arr.len(), 1);
-                        }
-                        Some(PrimaryData::Single(_)) => {
-                            println!(
-                                "api_document_collection_from_json_file : Expected one Resource in \
+        Ok(x) => match x {
+            JsonApiDocument::Error(_) => assert!(false),
+            JsonApiDocument::Data(res) => {
+                match res.data {
+                    Some(PrimaryData::Multiple(arr)) => {
+                        assert_eq!(arr.len(), 1);
+                    }
+                    Some(PrimaryData::Single(_)) => {
+                        println!(
+                            "api_document_collection_from_json_file : Expected one Resource in \
                                       a vector, not a direct Resource"
-                            );
-                            assert!(false);
-                        }
-                        Some(PrimaryData::None) => {
-                            println!(
-                                "api_document_collection_from_json_file : Expected one Resource in \
+                        );
+                        assert!(false);
+                    }
+                    Some(PrimaryData::None) => {
+                        println!(
+                            "api_document_collection_from_json_file : Expected one Resource in \
                                       a vector"
-                            );
-                            assert!(false);
-                        }
-                        None => assert!(false),
+                        );
+                        assert!(false);
                     }
+                    None => assert!(false),
+                }
 
-                    match res.included {
-                        Some(arr) => {
-                            assert_eq!(arr.len(), 3);
-                            assert_eq!(arr[0].id, "9");
-                            assert_eq!(arr[1].id, "5");
-                            assert_eq!(arr[2].id, "12");
-                        }
-                        None => {
-                            println!(
-                                "api_document_collection_from_json_file : Expected three Resources \
+                match res.included {
+                    Some(arr) => {
+                        assert_eq!(arr.len(), 3);
+                        assert_eq!(arr[0].id, Some("9".into()));
+                        assert_eq!(arr[1].id, Some("5".into()));
+                        assert_eq!(arr[2].id, Some("12".into()));
+                    }
+                    None => {
+                        println!(
+                            "api_document_collection_from_json_file : Expected three Resources \
                                       in 'included' in a vector"
-                            );
-                            assert!(false);
-                        }
+                        );
+                        assert!(false);
                     }
+                }
 
-                    match res.links {
-                        Some(links) => {
-                            assert_eq!(links.len(), 3);
-                        }
-                        None => {
-                            println!("api_document_collection_from_json_file : expected links");
-                            assert!(false);
-                        }
+                match res.links {
+                    Some(links) => {
+                        assert_eq!(links.len(), 3);
+                    }
+                    None => {
+                        println!("api_document_collection_from_json_file : expected links");
+                        assert!(false);
                     }
                 }
             }
-        }
+        },
         Err(err) => {
             println!("api_document_collection_from_json_file : Error: {:?}", err);
             assert!(false);
@@ -383,54 +389,45 @@ fn can_get_attribute() {
         Ok(res) => {
             match res.get_attribute("likes") {
                 None => assert!(false),
-                Some(val) => {
-                    match val.as_i64() {
-                        None => assert!(false),
-                        Some(num) => {
-                            let x: i64 = 250;
-                            assert_eq!(num, x);
-                        }
+                Some(val) => match val.as_i64() {
+                    None => assert!(false),
+                    Some(num) => {
+                        let x: i64 = 250;
+                        assert_eq!(num, x);
                     }
-                }
+                },
             }
 
             match res.get_attribute("title") {
                 None => assert!(false),
-                Some(val) => {
-                    match val.as_str() {
-                        None => assert!(false),
-                        Some(s) => {
-                            assert_eq!(s, "Rails is Omakase");
-                        }
+                Some(val) => match val.as_str() {
+                    None => assert!(false),
+                    Some(s) => {
+                        assert_eq!(s, "Rails is Omakase");
                     }
-                }
+                },
             }
 
             match res.get_attribute("published") {
                 None => assert!(false),
-                Some(val) => {
-                    match val.as_bool() {
-                        None => assert!(false),
-                        Some(b) => {
-                            assert_eq!(b, true);
-                        }
+                Some(val) => match val.as_bool() {
+                    None => assert!(false),
+                    Some(b) => {
+                        assert_eq!(b, true);
                     }
-                }
+                },
             }
 
             match res.get_attribute("tags") {
                 None => assert!(false),
-                Some(val) => {
-                    match val.as_array() {
-                        None => assert!(false),
-                        Some(arr) => {
-                            assert_eq!(arr[0], "rails");
-                            assert_eq!(arr[1], "news");
-                        }
+                Some(val) => match val.as_array() {
+                    None => assert!(false),
+                    Some(arr) => {
+                        assert_eq!(arr[0], "rails");
+                        assert_eq!(arr[1], "news");
                     }
-                }
+                },
             }
-
         }
     }
 }
@@ -450,17 +447,15 @@ fn can_diff_resource() {
             // So far so good
             match data2 {
                 Err(_) => assert!(false),
-                Ok(res2) => {
-                    match res1.diff(res2) {
-                        Err(_) => {
-                            assert!(false);
-                        }
-                        Ok(patchset) => {
-                            println!("can_diff_resource: PatchSet is {:?}", patchset);
-                            assert_eq!(patchset.patches.len(), 5);
-                        }
+                Ok(res2) => match res1.diff(res2) {
+                    Err(_) => {
+                        assert!(false);
                     }
-                }
+                    Ok(patchset) => {
+                        println!("can_diff_resource: PatchSet is {:?}", patchset);
+                        assert_eq!(patchset.patches.len(), 5);
+                    }
+                },
             }
         }
     }
@@ -471,16 +466,14 @@ fn it_omits_empty_document_and_primary_data_keys() {
     let _ = env_logger::try_init();
     let resource = Resource {
         _type: "test".into(),
-        id: "123".into(),
+        id: Some("123".into()),
         attributes: ResourceAttributes::new(),
         ..Default::default()
     };
-    let doc = JsonApiDocument::Data (
-        DocumentData {
-            data: Some(PrimaryData::Single(Box::new(resource))),
-            ..Default::default()
-        }
-    );
+    let doc = JsonApiDocument::Data(DocumentData {
+        data: Some(PrimaryData::Single(Box::new(resource))),
+        ..Default::default()
+    });
 
     assert_eq!(
         serde_json::to_string(&doc).unwrap(),
@@ -490,12 +483,10 @@ fn it_omits_empty_document_and_primary_data_keys() {
 
 #[test]
 fn it_does_not_omit_an_empty_primary_data() {
-    let doc = JsonApiDocument::Data (
-        DocumentData {
-            data: Some(PrimaryData::None),
-            ..Default::default()
-        }
-    );
+    let doc = JsonApiDocument::Data(DocumentData {
+        data: Some(PrimaryData::None),
+        ..Default::default()
+    });
 
     assert_eq!(serde_json::to_string(&doc).unwrap(), r#"{"data":null}"#);
 }
@@ -506,12 +497,10 @@ fn it_omits_empty_error_keys() {
         id: Some("error_id".to_string()),
         ..Default::default()
     };
-    let doc = JsonApiDocument::Error (
-        DocumentError {
-            errors: vec![error],
-            ..Default::default()
-        }
-    );
+    let doc = JsonApiDocument::Error(DocumentError {
+        errors: vec![error],
+        ..Default::default()
+    });
     assert_eq!(
         serde_json::to_string(&doc).unwrap(),
         r#"{"errors":[{"id":"error_id"}]}"#

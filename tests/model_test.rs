@@ -11,7 +11,7 @@ use helper::read_json_file;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct Author {
-    id: String,
+    id: Option<String>,
     name: String,
     books: Vec<Book>,
 }
@@ -19,16 +19,16 @@ jsonapi_model!(Author; "authors"; has many books);
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct Book {
-    id: String,
+    id: Option<String>,
     title: String,
     first_chapter: Chapter,
-    chapters: Vec<Chapter>
+    chapters: Vec<Chapter>,
 }
 jsonapi_model!(Book; "books"; has one first_chapter; has many chapters);
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct Chapter {
-    id: String,
+    id: Option<String>,
     title: String,
     ordering: i32,
 }
@@ -37,13 +37,29 @@ jsonapi_model!(Chapter; "chapters");
 #[test]
 fn to_jsonapi_document_and_back() {
     let book = Book {
-        id: "1".into(),
+        id: Some("1".into()),
         title: "The Fellowship of the Ring".into(),
-        first_chapter: Chapter { id: "1".into(), title: "A Long-expected Party".into(), ordering: 1 },
+        first_chapter: Chapter {
+            id: Some("1".into()),
+            title: "A Long-expected Party".into(),
+            ordering: 1,
+        },
         chapters: vec![
-            Chapter { id: "1".into(), title: "A Long-expected Party".into(), ordering: 1 },
-            Chapter { id: "2".into(), title: "The Shadow of the Past".into(), ordering: 2 },
-            Chapter { id: "3".into(), title: "Three is Company".into(), ordering: 3 }
+            Chapter {
+                id: Some("1".into()),
+                title: "A Long-expected Party".into(),
+                ordering: 1,
+            },
+            Chapter {
+                id: Some("2".into()),
+                title: "The Shadow of the Past".into(),
+                ordering: 2,
+            },
+            Chapter {
+                id: Some("3".into()),
+                title: "Three is Company".into(),
+                ordering: 3,
+            },
         ],
     };
 
@@ -51,8 +67,8 @@ fn to_jsonapi_document_and_back() {
     let json = serde_json::to_string(&doc).unwrap();
     let book_doc: DocumentData = serde_json::from_str(&json)
         .expect("Book DocumentData should be created from the book json");
-    let book_again = Book::from_jsonapi_document(&book_doc)
-        .expect("Book should be generated from the book_doc");
+    let book_again =
+        Book::from_jsonapi_document(&book_doc).expect("Book should be generated from the book_doc");
 
     assert_eq!(book, book_again);
 }
@@ -61,18 +77,18 @@ fn to_jsonapi_document_and_back() {
 fn numeric_id() {
     #[derive(Debug, PartialEq, Serialize, Deserialize)]
     struct NumericChapter {
-        id: i32,
+        id: Option<i32>,
         title: String,
     }
     jsonapi_model!(NumericChapter; "numeric_chapter");
 
     let chapter = NumericChapter {
-        id: 24,
+        id: Some(24),
         title: "The Riders of Rohan".into(),
     };
 
     let (res, _) = chapter.to_jsonapi_resource();
-    assert_eq!(res.id, "24".to_string());
+    assert_eq!(res.id, Some("24".to_string()));
 
     let doc = chapter.to_jsonapi_document();
     assert!(doc.is_valid());
@@ -92,12 +108,12 @@ fn numeric_id() {
 fn test_vec_to_jsonapi_document() {
     let chapters = vec![
         Chapter {
-            id: "45".into(),
+            id: Some("45".into()),
             title: "The Passing of the Grey Company".into(),
             ordering: 2,
         },
         Chapter {
-            id: "46".into(),
+            id: Some("46".into()),
             title: "The Muster of Rohan".into(),
             ordering: 3,
         },
