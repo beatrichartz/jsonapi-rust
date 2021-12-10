@@ -5,3 +5,4 @@ src/*.bk
 tests/*.bk
 *.swp
 *.swo
+.idea/
