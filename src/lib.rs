@@ -63,31 +63,26 @@
 //! variable type in `Result`
 //!
 //! ```rust
+//! #[macro_use] extern crate serde_derive;
+//! #[macro_use] extern crate jsonapi;
+//! use jsonapi::api::*;
+//! use jsonapi::model::*;
+//!
 //! let serialized = r#"
 //! {
-//!   "data": [{
-//!     "type": "articles",
-//!     "id": "1",
-//!     "attributes": {
-//!       "title": "JSON:API paints my bikeshed!",
-//!       "body": "The shortest article. Ever."
-//!     },
-//!     "relationships": {
-//!       "author": {
-//!         "data": {"id": "42", "type": "people"}
-//!       }
+//!   "type": "articles",
+//!   "id": "1",
+//!   "attributes": {
+//!     "title": "JSON:API paints my bikeshed!",
+//!     "body": "The shortest article. Ever."
+//!   },
+//!   "relationships": {
+//!     "author": {
+//!       "data": {"id": "42", "type": "people"}
 //!     }
-//!   }],
-//!   "included": [
-//!     {
-//!       "type": "people",
-//!       "id": "42",
-//!       "attributes": {
-//!         "name": "John"
-//!       }
-//!     }
-//!   ]
-//! }"#;
+//!   }
+//! }
+//! "#;
 //! let data: Result<Resource, serde_json::Error> = serde_json::from_str(&serialized);
 //! assert_eq!(data.is_ok(), true);
 //! ```
@@ -96,6 +91,24 @@
 //! [Resource::from_str](api/struct.Resource.html) trait implementation
 //!
 //! ```rust
+//! use jsonapi::api::*;
+//! use std::str::FromStr;
+//!
+//! let serialized = r#"
+//! {
+//!   "type": "articles",
+//!   "id": "1",
+//!   "attributes": {
+//!     "title": "JSON:API paints my bikeshed!",
+//!     "body": "The shortest article. Ever."
+//!   },
+//!   "relationships": {
+//!     "author": {
+//!       "data": {"id": "42", "type": "people"}
+//!     }
+//!   }
+//! }
+//! "#;
 //! let data = Resource::from_str(&serialized);
 //! assert_eq!(data.is_ok(), true);
 //! ```
