@@ -8,17 +8,15 @@ pub trait JsonApiArray<M> {
 }
 
 impl<M: JsonApiModel> JsonApiArray<M> for Vec<M> {
-    fn get_models(&self) -> &[M] {
-        self
-    }
-    fn get_models_mut(&mut self) -> &mut [M] {
-        self
-    }
+    fn get_models(&self) -> &[M] { self }
+    fn get_models_mut(&mut self) -> &mut [M] { self }
 }
 
 impl<M: JsonApiModel> JsonApiArray<M> for Option<Vec<M>> {
     fn get_models(&self) -> &[M] {
-        self.as_ref().map(|v| v.as_slice()).unwrap_or(&[][..])
+        self.as_ref()
+            .map(|v| v.as_slice())
+            .unwrap_or(&[][..])
     }
 
     fn get_models_mut(&mut self) -> &mut [M] {

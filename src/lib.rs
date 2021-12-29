@@ -1,13 +1,13 @@
-#![deny(
-    missing_debug_implementations,
-    missing_copy_implementations,
-    trivial_casts,
-    trivial_numeric_casts,
-    unsafe_code,
-    unstable_features,
-    unused_import_braces,
-    unused_qualifications
-)]
+#![deny(missing_debug_implementations,
+        missing_copy_implementations,
+        trivial_casts,
+        trivial_numeric_casts,
+        unsafe_code,
+        unstable_features,
+        unused_import_braces,
+        unused_qualifications
+       )]
+
 #![doc(html_root_url = "https://docs.rs/jsonapi/")]
 
 //! This is documentation for the `jsonapi` crate.
@@ -38,14 +38,14 @@
 //!
 //! #[derive(Debug, PartialEq, Serialize, Deserialize)]
 //! struct Flea {
-//!     id: Option<String>,
+//!     id: String,
 //!     name: String,
 //! };
 //!
 //! jsonapi_model!(Flea; "flea");
 //!
 //! let example_flea = Flea {
-//!     id: Some("123".into()),
+//!     id: "123".into(),
 //!     name: "Mr.Flea".into(),
 //! };
 //!
@@ -154,6 +154,6 @@ extern crate error_chain;
 
 pub mod api;
 pub mod array;
-pub mod errors;
-pub mod model;
 pub mod query;
+pub mod model;
+pub mod errors;

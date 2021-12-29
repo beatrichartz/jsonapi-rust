@@ -1,10 +1,10 @@
 //! Defines custom types and structs primarily that composite the JSON:API
 //! document
-use crate::errors::*;
 use serde_json;
-use std;
 use std::collections::HashMap;
+use crate::errors::*;
 use std::str::FromStr;
+use std;
 
 /// Permitted JSON-API values (all JSON Values)
 pub type JsonApiValue = serde_json::Value;
@@ -25,7 +25,7 @@ pub type Included = Vec<Resource>;
 /// Data-related errors
 pub type JsonApiErrors = Vec<JsonApiError>;
 
-pub type JsonApiId = Option<String>;
+pub type JsonApiId = String;
 pub type JsonApiIds<'a> = Vec<&'a JsonApiId>;
 
 /// Resource Identifier
@@ -163,6 +163,7 @@ pub struct Pagination {
     pub last: Option<String>,
 }
 
+
 #[derive(Debug)]
 pub struct Patch {
     pub patch_type: PatchType,
@@ -182,7 +183,7 @@ impl PatchSet {
     pub fn new_for(resource: &Resource) -> Self {
         PatchSet {
             resource_type: resource._type.clone(),
-            resource_id: resource.id.clone().unwrap(),
+            resource_id: resource.id.clone(),
             patches: Vec::<Patch>::new(),
         }
     }
@@ -307,10 +308,12 @@ impl Resource {
     pub fn get_relationship(&self, name: &str) -> Option<&Relationship> {
         match self.relationships {
             None => None,
-            Some(ref relationships) => match relationships.get(name) {
-                None => None,
-                Some(rel) => Some(rel),
-            },
+            Some(ref relationships) => {
+                match relationships.get(name) {
+                    None => None,
+                    Some(rel) => Some(rel),
+                }
+            }
         }
     }
 
@@ -361,6 +364,7 @@ impl Resource {
                 other._type.clone(),
             ))
         } else {
+
             let mut self_keys: Vec<String> =
                 self.attributes.iter().map(|(key, _)| key.clone()).collect();
 
@@ -390,7 +394,8 @@ impl Resource {
                         None => {
                             error!(
                                 "Resource::diff unable to find attribute {:?} in {:?}",
-                                attr, other
+                                attr,
+                                other
                             );
                         }
                         Some(other_value) => {
@@ -404,6 +409,7 @@ impl Resource {
                             }
                         }
                     }
+
                 }
 
                 Ok(patchset)
@@ -414,8 +420,10 @@ impl Resource {
     pub fn patch(&mut self, patchset: PatchSet) -> Result<Resource> {
         let mut res = self.clone();
         for patch in &patchset.patches {
-            res.attributes
-                .insert(patch.subject.clone(), patch.next.clone());
+            res.attributes.insert(
+                patch.subject.clone(),
+                patch.next.clone(),
+            );
         }
         Ok(res)
     }
@@ -449,13 +457,12 @@ impl FromStr for Resource {
     }
 }
 
+
 impl Relationship {
     pub fn as_id(&self) -> std::result::Result<Option<&JsonApiId>, RelationshipAssumptionError> {
         match self.data {
             Some(IdentifierData::None) => Ok(None),
-            Some(IdentifierData::Multiple(_)) => {
-                Err(RelationshipAssumptionError::RelationshipIsAList)
-            }
+            Some(IdentifierData::Multiple(_)) => Err(RelationshipAssumptionError::RelationshipIsAList),
             Some(IdentifierData::Single(ref data)) => Ok(Some(&data.id)),
             None => Ok(None),
         }
@@ -464,12 +471,8 @@ impl Relationship {
     pub fn as_ids(&self) -> std::result::Result<Option<JsonApiIds>, RelationshipAssumptionError> {
         match self.data {
             Some(IdentifierData::None) => Ok(None),
-            Some(IdentifierData::Single(_)) => {
-                Err(RelationshipAssumptionError::RelationshipIsNotAList)
-            }
-            Some(IdentifierData::Multiple(ref data)) => {
-                Ok(Some(data.iter().map(|x| &x.id).collect()))
-            }
+            Some(IdentifierData::Single(_)) => Err(RelationshipAssumptionError::RelationshipIsNotAList),
+            Some(IdentifierData::Multiple(ref data)) => Ok(Some(data.iter().map(|x| &x.id).collect())),
             None => Ok(None),
         }
     }
