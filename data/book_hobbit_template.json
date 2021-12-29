@@ -1,0 +1,32 @@
+{
+  "data": {
+    "type": "books",
+    "attributes": {
+      "title": "The Hobbit"
+    },
+    "relationships": {
+      "first_chapter": {
+        "data": {
+          "id": "2",
+          "type": "chapters"
+        }
+      },
+      "chapters": {
+        "data": [
+          {
+            "id": "1",
+            "type": "chapters"
+          },
+          {
+            "id": "2",
+            "type": "chapters"
+          },
+          {
+            "id": "3",
+            "type": "chapters"
+          }
+        ]
+      }
+    }
+  }
+}

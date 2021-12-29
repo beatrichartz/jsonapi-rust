@@ -159,6 +159,27 @@ fn multiple_resource_from_json_string() {
 }
 
 #[test]
+fn single_resource_template_from_json_string() {
+    let _ = env_logger::try_init();
+    let serialized =
+        r#"{ "type" : "post", "attributes" : {}, "relationships" : {}, "links" : {} }"#;
+    let data: Result<ResourceTemplate, serde_json::Error> = serde_json::from_str(serialized);
+    assert_eq!(data.is_ok(), true);
+}
+
+#[test]
+fn multiple_resource_template_from_json_string() {
+    let _ = env_logger::try_init();
+    let serialized = r#"[
+            { "type" : "post", "attributes" : {}, "relationships" : {}, "links" : {} },
+            { "type" : "post", "attributes" : {}, "relationships" : {}, "links" : {} },
+            { "type" : "post", "attributes" : {}, "relationships" : {}, "links" : {} }
+        ]"#;
+    let data: Result<ResourceTemplates, serde_json::Error> = serde_json::from_str(serialized);
+    assert_eq!(data.is_ok(), true);
+}
+
+#[test]
 fn no_data_document_from_json_string() {
     let _ = env_logger::try_init();
     let serialized = r#"{
@@ -181,6 +202,18 @@ fn single_data_document_from_json_string() {
 }
 
 #[test]
+fn single_data_document_without_id_from_json_string() {
+    let _ = env_logger::try_init();
+    let serialized = r#"{
+            "data" : {
+                "type" : "post", "attributes" : {}, "relationships" : {}, "links" : {}
+            }
+        }"#;
+    let data: Result<JsonApiDocument, serde_json::Error> = serde_json::from_str(serialized);
+    assert_eq!(data.is_ok(), true);
+}
+
+#[test]
 fn multiple_data_document_from_json_string() {
     let _ = env_logger::try_init();
     let serialized = r#"{
@@ -188,6 +221,20 @@ fn multiple_data_document_from_json_string() {
                 { "id" :"1", "type" : "post", "attributes" : {}, "relationships" : {}, "links" : {} },
                 { "id" :"2", "type" : "post", "attributes" : {}, "relationships" : {}, "links" : {} },
                 { "id" :"3", "type" : "post", "attributes" : {}, "relationships" : {}, "links" : {} }
+            ]
+        }"#;
+    let data: Result<JsonApiDocument, serde_json::Error> = serde_json::from_str(serialized);
+    assert_eq!(data.is_ok(), true);
+}
+
+#[test]
+fn multiple_data_document_without_id_from_json_string() {
+    let _ = env_logger::try_init();
+    let serialized = r#"{
+            "data" : [
+                { "type" : "post", "attributes" : {}, "relationships" : {}, "links" : {} },
+                { "type" : "post", "attributes" : {}, "relationships" : {}, "links" : {} },
+                { "type" : "post", "attributes" : {}, "relationships" : {}, "links" : {} }
             ]
         }"#;
     let data: Result<JsonApiDocument, serde_json::Error> = serde_json::from_str(serialized);
@@ -204,24 +251,13 @@ fn api_document_from_json_file() {
     match data {
         Ok(res) => {
             match res {
-                JsonApiDocument::Error(_x) => assert!(false),
-                JsonApiDocument::Data(x) => {
-                    match x.data {
+                JsonApiDocument::Error(_) => panic!("Expected no document error"),
+                JsonApiDocument::Data(document_data) => {
+                    match document_data.data {
                         Some(PrimaryData::Multiple(arr)) => {
                             assert_eq!(arr.len(), 1);
                         }
-                        Some(PrimaryData::Single(_)) => {
-                            println!(
-                                "api_document_from_json_file : Expected one Resource in a vector, \
-                                      not a direct Resource"
-                            );
-                            assert!(false);
-                        }
-                        Some(PrimaryData::None) => {
-                            println!("api_document_from_json_file : Expected one Resource in a vector");
-                            assert!(false);
-                        }
-                        None => assert!(false),
+                        _ => panic!("Expected one resource")
                     }
                 }
             }
@@ -234,6 +270,60 @@ fn api_document_from_json_file() {
 }
 
 #[test]
+fn api_document_from_json_file_with_template() {
+    let _ = env_logger::try_init();
+
+    let s = crate::read_json_file("data/template.json");
+    let data: Result<JsonApiDocument, serde_json::Error> = serde_json::from_str(&s);
+
+    match data {
+        Ok(res) => {
+            match res {
+                JsonApiDocument::Error(_x) => assert!(false),
+                JsonApiDocument::Data(document_data) => {
+                    match document_data.data {
+                        Some(PrimaryData::SingleTemplate(resource_template)) => {
+                            assert_eq!(resource_template._type, "articles");
+                        }
+                        _ => {
+                            panic!("Expected one ResourceTemplate");
+                        }
+                    }
+                }
+            }
+        }
+        Err(err) => {
+            panic!("Error: {:?}", err);
+        }
+    }
+}
+
+#[test]
+fn api_document_from_json_file_with_templates() {
+    let _ = env_logger::try_init();
+
+    let s = crate::read_json_file("data/templates.json");
+    let data: Result<JsonApiDocument, serde_json::Error> = serde_json::from_str(&s);
+
+    match data {
+        Ok(document) => {
+            match document {
+                JsonApiDocument::Error(_x) => assert!(false),
+                JsonApiDocument::Data(document_data) => {
+                    match document_data.data {
+                        Some(PrimaryData::MultipleTemplates(arr)) => {
+                            assert_eq!(arr.len(), 1);
+                        }
+                        _ => panic!("Expected one ResourceTemplate in a vector")
+                    }
+                }
+            }
+        }
+        Err(err) => panic!("Error: {:?}", err)
+    }
+}
+
+#[test]
 fn api_document_collection_from_json_file() {
     let _ = env_logger::try_init();
 
@@ -241,64 +331,46 @@ fn api_document_collection_from_json_file() {
     let data: Result<JsonApiDocument, serde_json::Error> = serde_json::from_str(&s);
 
     match data {
-        Ok(x) => {
-            match x {
+        Ok(document) => {
+            match document {
                 JsonApiDocument::Error(_) => assert!(false),
-                JsonApiDocument::Data(res) => {
-                    match res.data {
+                JsonApiDocument::Data(document_data) => {
+                    match document_data.data {
                         Some(PrimaryData::Multiple(arr)) => {
                             assert_eq!(arr.len(), 1);
                         }
-                        Some(PrimaryData::Single(_)) => {
-                            println!(
-                                "api_document_collection_from_json_file : Expected one Resource in \
-                                      a vector, not a direct Resource"
-                            );
-                            assert!(false);
-                        }
-                        Some(PrimaryData::None) => {
-                            println!(
-                                "api_document_collection_from_json_file : Expected one Resource in \
-                                      a vector"
-                            );
-                            assert!(false);
-                        }
-                        None => assert!(false),
+                        _ => panic!("Expected a resource in a vector")
                     }
 
-                    match res.included {
+                    match document_data.included {
                         Some(arr) => {
                             assert_eq!(arr.len(), 3);
                             assert_eq!(arr[0].id, "9");
                             assert_eq!(arr[1].id, "5");
                             assert_eq!(arr[2].id, "12");
                         }
-                        None => {
-                            println!(
-                                "api_document_collection_from_json_file : Expected three Resources \
-                                      in 'included' in a vector"
-                            );
-                            assert!(false);
-                        }
+                        None => panic!("Expected three Resources in 'included' in a vector")
                     }
 
-                    match res.links {
+                    match document_data.links {
                         Some(links) => {
                             assert_eq!(links.len(), 3);
                         }
-                        None => {
-                            println!("api_document_collection_from_json_file : expected links");
-                            assert!(false);
-                        }
+                        None => panic!("expected links")
                     }
                 }
             }
         }
-        Err(err) => {
-            println!("api_document_collection_from_json_file : Error: {:?}", err);
-            assert!(false);
-        }
+        Err(err) => panic!("Error: {:?}", err)
     }
+}
+
+#[test]
+fn can_deserialize_jsonapi_example_resource_template() {
+    let _ = env_logger::try_init();
+    let s = crate::read_json_file("data/resource_template.json");
+    let data: Result<ResourceTemplate, serde_json::Error> = serde_json::from_str(&s);
+    assert!(data.is_ok());
 }
 
 // TODO - naming of this test and the test file should be more clear
@@ -531,7 +603,7 @@ fn it_allows_for_optional_attributes() {
 }
 
 #[test]
-fn it_validates_partialeq_when_compariing_documents() {
+fn it_validates_partialeq_when_comparing_documents() {
     let _ = env_logger::try_init();
     let document1 = r#"
         {
@@ -608,5 +680,5 @@ fn it_validates_partialeq_when_compariing_documents() {
     let doc2: Result<JsonApiDocument, serde_json::Error> = serde_json::from_str(document2);
     assert_eq!(doc1.is_ok(), true);
     assert_eq!(doc2.is_ok(), true);
-    assert!(doc1.unwrap() == doc2.unwrap());
+    assert_eq!(doc1.unwrap(), doc2.unwrap());
 }

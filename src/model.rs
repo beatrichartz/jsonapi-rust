@@ -47,6 +47,8 @@ where
             Some(primary_data) => {
                 match *primary_data {
                     PrimaryData::None => bail!("Document had no data"),
+                    PrimaryData::SingleTemplate(_) => bail!("Document had only template data"),
+                    PrimaryData::MultipleTemplates(_) => bail!("Document had only template data"),
                     PrimaryData::Single(ref resource) => {
                         Self::from_jsonapi_resource(resource, &doc.included)
                     }
@@ -79,7 +81,7 @@ where
 
             (resource, self.build_included())
         } else {
-            panic!(format!("{} is not a Value::Object", self.jsonapi_type()))
+            panic!("{} is not a Value::Object", self.jsonapi_type())
         }
     }
 

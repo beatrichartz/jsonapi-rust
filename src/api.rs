@@ -11,6 +11,8 @@ pub type JsonApiValue = serde_json::Value;
 
 /// Vector of `Resource`
 pub type Resources = Vec<Resource>;
+/// Vector of `ResourceTemplate`
+pub type ResourceTemplates = Vec<ResourceTemplate>;
 /// Vector of `ResourceIdentifiers`
 pub type ResourceIdentifiers = Vec<ResourceIdentifier>;
 pub type Links = HashMap<String, JsonApiValue>;
@@ -54,6 +56,21 @@ pub struct Resource {
     pub meta: Option<Meta>,
 }
 
+/// Representation of a JSON:API resource template. This is a struct that contains
+/// attributes that map to the JSON:API specification of `type`,
+/// `attributes`, `relationships`, `links`, and `meta`
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+pub struct ResourceTemplate {
+    #[serde(rename = "type")]
+    pub _type: String,
+    #[serde(default)]
+    pub attributes: ResourceAttributes,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relationships: Option<Relationships>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Meta>,
+}
+
 /// Relationship with another object
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Relationship {
@@ -70,6 +87,8 @@ pub enum PrimaryData {
     None,
     Single(Box<Resource>),
     Multiple(Resources),
+    SingleTemplate(Box<ResourceTemplate>),
+    MultipleTemplates(ResourceTemplates),
 }
 
 /// Valid Resource Identifier (can be None)

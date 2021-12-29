@@ -156,4 +156,5 @@ pub mod api;
 pub mod array;
 pub mod query;
 pub mod model;
+pub mod template;
 pub mod errors;
